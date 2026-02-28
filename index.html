@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a5f2a">
+    <meta name="description" content="AI Rural Road Pothole Reporter - Report road potholes to government">
+    <title>AI Rural Road Pothole Reporter</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%A3%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <span class="logo">🛣️</span>
+                <h1 class="app-title">AI Pothole Reporter</h1>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Step 1: Photo Capture -->
+            <section class="step-section" id="step1">
+                <div class="step-header">
+                    <span class="step-number">1</span>
+                    <h2>Capture Pothole Photo</h2>
+                </div>
+                
+                <div class="photo-capture-area">
+                    <div id="cameraPreview" class="camera-preview hidden">
+                        <video id="video" autoplay playsinline></video>
+                        <canvas id="captureCanvas" class="hidden"></canvas>
+                    </div>
+                    <div id="photoPreview" class="photo-preview hidden">
+                        <img id="previewImage" alt="Pothole preview">
+                        <div id="aiResults" class="ai-results hidden">
+                            <div class="severity-badge" id="severityBadge">
+                                <span class="severity-label">Analyzing...</span>
+                                <span class="confidence" id="confidenceScore"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="capturePlaceholder" class="capture-placeholder">
+                        <span class="placeholder-icon">📷</span>
+                        <p>Take or upload a photo</p>
+                    </div>
+                </div>
+
+                <div class="capture-buttons">
+                    <button id="startCameraBtn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">📷</span>
+                        <span>Open Camera</span>
+                    </button>
+                    <button id="captureBtn" class="btn btn-primary btn-large hidden">
+                        <span class="btn-icon">📸</span>
+                        <span>Capture</span>
+                    </button>
+                    <button id="retakeBtn" class="btn btn-secondary btn-large hidden">
+                        <span class="btn-icon">🔄</span>
+                        <span>Retake</span>
+                    </button>
+                    <label for="fileInput" class="btn btn-outline btn-large" id="uploadBtn">
+                        <span class="btn-icon">📁</span>
+                        <span>Upload Photo</span>
+                    </label>
+                    <input type="file" id="fileInput" accept="image/*" capture="environment" class="hidden">
+                </div>
+            </section>
+
+            <!-- Step 2: Location -->
+            <section class="step-section" id="step2">
+                <div class="step-header">
+                    <span class="step-number">2</span>
+                    <h2>Location Details</h2>
+                </div>
+
+                <div class="location-section">
+                    <button id="getLocationBtn" class="btn btn-primary btn-large btn-full">
+                        <span class="btn-icon">📍</span>
+                        <span>Get GPS Location</span>
+                    </button>
+                    
+                    <div id="locationStatus" class="location-status hidden">
+                        <span class="status-icon">🔄</span>
+                        <span>Getting location...</span>
+                    </div>
+
+                    <div id="locationResult" class="location-result hidden">
+                        <div class="location-item">
+                            <span class="location-label">Latitude:</span>
+                            <span id="latitude" class="location-value"></span>
+                        </div>
+                        <div class="location-item">
+                            <span class="location-label">Longitude:</span>
+                            <span id="longitude" class="location-value"></span>
+                        </div>
+                        <div class="location-item">
+                            <span class="location-label">Accuracy:</span>
+                            <span id="accuracy" class="location-value"></span>
+                        </div>
+                    </div>
+
+                    <div class="divider">
+                        <span>OR</span>
+                    </div>
+
+                    <div class="manual-location">
+                        <label class="input-label">Select Location Manually</label>
+                        <select id="districtSelect" class="select-input">
+                            <option value="">Select District</option>
+                        </select>
+                        <select id="mandalSelect" class="select-input" disabled>
+                            <option value="">Select Mandal</option>
+                        </select>
+                        <select id="villageSelect" class="select-input" disabled>
+                            <option value="">Select Village</option>
+                        </select>
+                    </div>
+
+                    <div class="road-id-section">
+                        <label class="input-label">Road ID (Optional)</label>
+                        <input type="text" id="roadId" class="text-input" placeholder="SH-XX or MDR-XX">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 3: AI Analysis -->
+            <section class="step-section" id="step3">
+                <div class="step-header">
+                    <span class="step-number">3</span>
+                    <h2>AI Analysis</h2>
+                </div>
+
+                <div id="aiAnalysisPanel" class="ai-analysis-panel">
+                    <div id="modelLoading" class="model-loading">
+                        <span class="loading-spinner">🔄</span>
+                        <p>Loading AI Model...</p>
+                        <div class="progress-bar">
+                            <div id="modelProgress" class="progress-fill"></div>
+                        </div>
+                    </div>
+
+                    <div id="analysisResult" class="analysis-result hidden">
+                        <div class="result-header">
+                            <span>Detected Severity:</span>
+                        </div>
+                        <div id="severityDisplay" class="severity-display">
+                            <span id="severityIcon" class="severity-icon">⚠️</span>
+                            <span id="severityText" class="severity-text">-</span>
+                            <span id="confidencePercent" class="confidence-percent">-</span>
+                        </div>
+                        <div id="repairDeadline" class="repair-deadline">
+                            <span>Suggested Repair:</span>
+                            <span id="deadlineText" class="deadline-text">-</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Step 4: Complaint -->
+            <section class="step-section" id="step4">
+                <div class="step-header">
+                    <span class="step-number">4</span>
+                    <h2>Generated Complaint</h2>
+                </div>
+
+                <div class="complaint-section">
+                    <div class="complaint-header">
+                        <span class="complaint-label">Complaint:</span>
+                        <button id="voiceBtn" class="btn btn-small btn-voice" disabled>
+                            <span class="btn-icon">🔊</span>
+                            <span>Read Aloud</span>
+                        </button>
+                    </div>
+                    <textarea id="complaintText" class="complaint-textarea" rows="8" readonly></textarea>
+                    <p class="edit-hint">* You can edit the complaint before sending</p>
+                </div>
+            </section>
+
+            <!-- Step 5: Submit -->
+            <section class="step-section" id="step5">
+                <div class="step-header">
+                    <span class="step-number">5</span>
+                    <h2>Submit Report</h2>
+                </div>
+
+                <div class="submit-section">
+                    <button id="saveLocalBtn" class="btn btn-secondary btn-large btn-full">
+                        <span class="btn-icon">💾</span>
+                        <span>Save for Later</span>
+                    </button>
+
+                    <div class="submit-buttons">
+                        <a id="whatsappBtn" class="btn btn-whatsapp btn-large" href="#" target="_blank" rel="noopener">
+                            <span class="btn-icon">💬</span>
+                            <span>WhatsApp</span>
+                        </a>
+                        <a id="emailBtn" class="btn btn-email btn-large" href="#" target="_blank" rel="noopener">
+                            <span class="btn-icon">📧</span>
+                            <span>Email</span>
+                        </a>
+                    </div>
+
+                    <div class="contact-inputs">
+                        <label class="input-label">WhatsApp Number</label>
+                        <input type="tel" id="whatsappNumber" class="text-input" placeholder="+91XXXXXXXXXX" value="+91">
+                        
+                        <label class="input-label">Email Address</label>
+                        <input type="email" id="emailAddress" class="text-input" placeholder="officer@department.gov.in">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Saved Reports -->
+            <section class="step-section saved-reports-section">
+                <div class="step-header">
+                    <h2>Saved Reports</h2>
+                    <button id="clearAllBtn" class="btn btn-small btn-danger hidden">Clear All</button>
+                </div>
+                <div id="savedReportsList" class="saved-reports-list">
+                    <p class="no-reports">No saved reports</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>Made for Rural India</p>
+            <p class="offline-status" id="offlineStatus">
+                <span class="status-dot online"></span>
+                <span>Online</span>
+            </p>
+        </footer>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden">
+            <span id="toastIcon" class="toast-icon">✓</span>
+            <span id="toastMessage" class="toast-message"></span>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-content">
+                <span class="loading-spinner large">🔄</span>
+                <p id="loadingText">Processing...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
